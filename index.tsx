@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -49,8 +50,8 @@ const Header = () => (
   <header className="fixed w-full top-0 z-50 shadow-sm" style={{ background: "rgba(255, 255, 255, 0.9)", backdropFilter: "blur(10px)", borderBottom: "1px solid rgba(229, 231, 235, 0.5)" }}>
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex justify-between items-center h-20">
-        <div className="logo text-2xl font-bold text-indigo-600 tracking-tighter">
-          CineMatch AI
+        <div className="logo h-10 flex items-center">
+            <img src="Logo.svg" alt="CineMatch AI" className="h-full" />
         </div>
         <nav className="hidden md:flex space-x-8 items-center">
           <a href="#problema" className="text-gray-600 hover:text-indigo-600 font-medium">El Problema</a>
@@ -89,6 +90,64 @@ const Simulator = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
   const [processingStep, setProcessingStep] = useState(0);
+
+  // File Upload States
+  const [dragActive, setDragActive] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+  // --- FILE HANDLING HANDLERS ---
+  const handleDrag = function(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = function(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      handleFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleFileChange = function(e: React.ChangeEvent<HTMLInputElement>) {
+    e.preventDefault();
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    }
+  };
+
+  const handleFile = (file: File) => {
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      
+      setIsUploading(true);
+      
+      // Simulate reading/parsing delay
+      setTimeout(() => {
+        if (extension === 'txt') {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (e.target?.result) {
+                    setScript(e.target.result as string);
+                }
+                setIsUploading(false);
+            };
+            reader.readAsText(file);
+        } else {
+            // For PDF/DOC in this frontend-only demo, we simulate extraction by using the default script
+            // In a real production app, this would be sent to a backend parser.
+            setScript(DEFAULT_SCRIPT); // Using default script to simulate successful extraction for demo
+            setIsUploading(false);
+            // Optional: Alert to inform user
+            // alert("Archivo cargado. Texto simulado para la demo (parsing backend no conectado).");
+        }
+      }, 1500);
+  };
 
   const processScript = async () => {
     setView("processing");
@@ -294,17 +353,49 @@ const Simulator = () => {
           {/* INPUT VIEW */}
           {view === "input" && (
             <div className="p-8">
+               
+               {/* UPLOAD AREA */}
+               <div 
+                   className={`upload-area mb-6 ${dragActive ? "dragover" : ""}`}
+                   onDragEnter={handleDrag} 
+                   onDragLeave={handleDrag} 
+                   onDragOver={handleDrag} 
+                   onDrop={handleDrop}
+                   onClick={() => document.getElementById('file-upload')?.click()}
+               >
+                  {isUploading ? (
+                    <div className="py-8">
+                        <div className="spinner border-indigo-200 border-t-indigo-600"></div>
+                        <p className="mt-2 text-gray-500">Extrayendo texto del guion...</p>
+                    </div>
+                  ) : (
+                    <>
+                        <i className="fas fa-cloud-upload-alt upload-icon text-5xl text-gray-300 mb-4 block mx-auto"></i>
+                        <h3 className="text-xl font-semibold text-gray-800 mb-2">Arrastra tu guion aquí</h3>
+                        <p className="text-gray-500 mb-4">o haz clic para buscar (.pdf, .doc, .docx, .txt)</p>
+                        <input 
+                            type="file" 
+                            id="file-upload" 
+                            className="hidden" 
+                            accept=".pdf,.doc,.docx,.txt"
+                            onChange={handleFileChange}
+                        />
+                    </>
+                  )}
+               </div>
+
                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Pega tu escena aquí:</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">O pega/edita tu escena aquí:</label>
                   <textarea 
-                    className="w-full h-64 p-4 bg-gray-50 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full h-48 p-4 bg-gray-50 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                     value={script}
                     onChange={(e) => setScript(e.target.value)}
                     placeholder="INT. LOCATION - DAY..."
+                    disabled={isUploading}
                   />
                </div>
                <div className="text-center">
-                  <button onClick={processScript} className="btn-primary px-8 py-3 text-lg shadow-lg">
+                  <button onClick={processScript} disabled={isUploading} className="btn-primary px-8 py-3 text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
                     <i className="fas fa-magic mr-2"></i> Analizar y Generar Storyboard
                   </button>
                </div>
@@ -444,8 +535,8 @@ const App = () => {
       
       <footer className="bg-white border-t border-gray-200 py-10 mt-20">
         <div className="max-w-7xl mx-auto px-4 text-center">
-            <div className="flex items-center justify-center mb-4 text-2xl font-bold text-gray-400 tracking-tighter">
-               CineMatch AI
+            <div className="flex items-center justify-center mb-4 h-8">
+               <img src="Logo.svg" alt="CineMatch AI" className="h-full grayscale opacity-50" />
             </div>
             <p className="text-gray-500 text-sm mb-2">&copy; 2025 CineMatch AI. Un proyecto impulsado por la innovación y la Data Science.</p>
             <p className="text-gray-400 text-xs">Hecho con Google Gemini & Veo.</p>
